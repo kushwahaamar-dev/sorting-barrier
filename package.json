@@ -1,0 +1,17 @@
+{
+    "name": "sorting-barrier-demo",
+    "version": "1.0.0",
+    "description": "Interactive visualization comparing Dijkstra vs Tsinghua SSSP algorithm",
+    "scripts": {
+        "start": "npx serve .",
+        "dev": "npx serve ."
+    },
+    "keywords": [
+        "dijkstra",
+        "algorithm",
+        "visualization",
+        "shortest-path"
+    ],
+    "author": "",
+    "license": "MIT"
+}

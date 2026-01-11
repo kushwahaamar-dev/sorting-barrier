@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Breaking the Sorting Barrier | Interactive Map</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --background: 240 10% 3.9%;
+            --foreground: 0 0% 98%;
+            --card: 240 10% 6%;
+            --muted-foreground: 240 5% 64.9%;
+            --border: 240 3.7% 15.9%;
+            --secondary: 240 3.7% 15.9%;
+            --radius: 0.5rem;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: hsl(var(--background));
+            color: hsl(var(--foreground));
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Layout */
+        .app-layout {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            height: 100vh;
+        }
+
+        @media (max-width: 900px) {
+            .app-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                display: none;
+            }
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: hsl(var(--card));
+            border-right: 1px solid hsl(var(--border));
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1rem;
+            padding-bottom: 16px;
+            border-bottom: 1px solid hsl(var(--border));
+        }
+
+        .card {
+            background: hsl(var(--secondary));
+            border-radius: var(--radius);
+            padding: 16px;
+        }
+
+        .card-title {
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Algorithm info */
+        .algo-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: hsl(var(--background));
+            border-radius: calc(var(--radius) - 2px);
+            margin-bottom: 8px;
+        }
+
+        .algo-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        .algo-info {
+            flex: 1;
+        }
+
+        .algo-info h4 {
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .algo-info .complexity {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: hsl(var(--muted-foreground));
+        }
+
+        /* Metrics */
+        .metric-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .metric-box {
+            text-align: center;
+            padding: 14px 10px;
+            background: hsl(var(--background));
+            border-radius: calc(var(--radius) - 2px);
+        }
+
+        .metric-label {
+            font-size: 0.65rem;
+            color: hsl(var(--muted-foreground));
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .metric-value.purple {
+            color: #a78bfa;
+        }
+
+        .metric-value.green {
+            color: #4ade80;
+        }
+
+        /* Winner */
+        .winner-banner {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px;
+            border-radius: calc(var(--radius) - 2px);
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-top: 8px;
+        }
+
+        .winner-banner.show {
+            display: flex;
+        }
+
+        .winner-banner.dijkstra {
+            background: rgba(167, 139, 250, 0.15);
+            color: #a78bfa;
+        }
+
+        .winner-banner.new {
+            background: rgba(74, 222, 128, 0.15);
+            color: #4ade80;
+        }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 16px;
+            border-radius: calc(var(--radius) - 2px);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            flex: 1;
+        }
+
+        .btn-primary {
+            background: hsl(var(--foreground));
+            color: hsl(var(--background));
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .btn-outline {
+            border: 1px solid hsl(var(--border));
+            background: transparent;
+            color: hsl(var(--foreground));
+        }
+
+        .btn-outline:hover {
+            background: hsl(var(--secondary));
+        }
+
+        /* Instructions */
+        .instructions {
+            font-size: 0.75rem;
+            color: hsl(var(--muted-foreground));
+            line-height: 1.5;
+            padding: 12px;
+            background: hsl(var(--background));
+            border-radius: calc(var(--radius) - 2px);
+        }
+
+        .instructions strong {
+            color: hsl(var(--foreground));
+        }
+
+        /* Map */
+        .map-container {
+            position: relative;
+            height: 100%;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            background: #1a1a2e;
+        }
+
+        /* Leaflet dark theme overrides */
+        .leaflet-container {
+            background: #1a1a2e;
+        }
+
+        .leaflet-control-zoom a {
+            background: hsl(var(--card)) !important;
+            color: hsl(var(--foreground)) !important;
+            border-color: hsl(var(--border)) !important;
+        }
+
+        .leaflet-control-zoom a:hover {
+            background: hsl(var(--secondary)) !important;
+        }
+
+        .leaflet-control-attribution {
+            background: hsl(var(--background)/0.8) !important;
+            color: hsl(var(--muted-foreground)) !important;
+            font-size: 10px !important;
+        }
+
+        .leaflet-control-attribution a {
+            color: hsl(var(--foreground)) !important;
+        }
+
+        /* Map overlay panel */
+        .map-overlay {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            z-index: 1000;
+            background: hsl(var(--card)/0.95);
+            backdrop-filter: blur(8px);
+            padding: 14px;
+            border-radius: var(--radius);
+            border: 1px solid hsl(var(--border));
+            font-size: 0.75rem;
+            min-width: 160px;
+        }
+
+        .overlay-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 0.8rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            color: hsl(var(--muted-foreground));
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .legend-line {
+            width: 20px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        /* Node and graph count */
+        .graph-stats {
+            position: absolute;
+            bottom: 24px;
+            left: 16px;
+            z-index: 1000;
+            background: hsl(var(--card)/0.95);
+            backdrop-filter: blur(8px);
+            padding: 10px 14px;
+            border-radius: var(--radius);
+            border: 1px solid hsl(var(--border));
+            font-size: 0.75rem;
+            color: hsl(var(--muted-foreground));
+        }
+
+        .graph-stats strong {
+            color: hsl(var(--foreground));
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="logo">
+                <i data-lucide="map-pin" style="width: 18px;"></i>
+                Dijkstra vs Tsinghua SSSP
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <i data-lucide="cpu" style="width: 14px;"></i>
+                    Algorithms
+                </div>
+                <div class="algo-row">
+                    <div class="algo-dot" style="color: #a78bfa; background: currentColor;"></div>
+                    <div class="algo-info">
+                        <h4>Dijkstra (1956)</h4>
+                        <div class="complexity">O(m + n log n)</div>
+                    </div>
+                </div>
+                <div class="algo-row">
+                    <div class="algo-dot" style="color: #4ade80; background: currentColor;"></div>
+                    <div class="algo-info">
+                        <h4>Tsinghua SSSP (2025)</h4>
+                        <div class="complexity">O(m log²/³ n) — Tsinghua</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <i data-lucide="timer" style="width: 14px;"></i>
+                    Time Comparison
+                </div>
+                <div class="metric-grid">
+                    <div class="metric-box">
+                        <div class="metric-label">Dijkstra</div>
+                        <div class="metric-value purple" id="dijkstra-time">—</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Tsinghua</div>
+                        <div class="metric-value green" id="new-time">—</div>
+                    </div>
+                </div>
+                <div class="winner-banner" id="winner-banner">
+                    <i data-lucide="trophy" style="width: 16px;"></i>
+                    <span id="winner-text">Winner</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <i data-lucide="bar-chart-2" style="width: 14px;"></i>
+                    Operations
+                </div>
+                <div class="metric-grid">
+                    <div class="metric-box">
+                        <div class="metric-label">Dijkstra</div>
+                        <div class="metric-value purple" id="dijkstra-ops">0</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Tsinghua</div>
+                        <div class="metric-value green" id="new-ops">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="runRace()">
+                    <i data-lucide="play" style="width: 14px;"></i> Race!
+                </button>
+                <button class="btn btn-outline" onclick="clearAll()">
+                    <i data-lucide="trash-2" style="width: 14px;"></i> Clear
+                </button>
+            </div>
+
+            <div class="instructions">
+                <strong>How to use:</strong><br>
+                1. Click anywhere on the map to set <strong>Start</strong> (green)<br>
+                2. Click again to set <strong>End</strong> (red)<br>
+                3. Click <strong>Race!</strong> to compare algorithms<br>
+                4. Zoom and pan the map freely
+            </div>
+        </aside>
+
+        <main class="map-container">
+            <div id="map"></div>
+
+            <div class="map-overlay">
+                <div class="overlay-title">Legend</div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #06b6d4;"></div>
+                    <span>Start Point</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #ef4444;"></div>
+                    <span>End Point</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-line" style="background: #a78bfa;"></div>
+                    <span>Dijkstra Path</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-line" style="background: #4ade80;"></div>
+                    <span>Tsinghua Path</span>
+                </div>
+            </div>
+
+            <div class="graph-stats">
+                <strong id="node-count">0</strong> nodes · <strong id="edge-count">0</strong> edges (generated grid)
+            </div>
+        </main>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // Initialize map centered on a nice location
+        const map = L.map('map', {
+            center: [40.7128, -74.0060], // NYC
+            zoom: 12,
+            zoomControl: true
+        });
+
+        // Dark tile layer (CartoDB Dark Matter)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+
+        // State
+        let startMarker = null;
+        let endMarker = null;
+        let startLatLng = null;
+        let endLatLng = null;
+        let nodes = [];
+        let adj = [];
+        let dijkstraPath = null;
+        let newPath = null;
+        let dijkstraFinished = false;
+        let newFinished = false;
+        let dijkstraTime = 0;
+        let newTime = 0;
+
+        // Custom icons
+        const startIcon = L.divIcon({
+            className: 'custom-marker',
+            html: '<div style="width:20px;height:20px;background:#06b6d4;border-radius:50%;border:3px solid white;box-shadow:0 0 10px #06b6d4;"></div>',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+
+        const endIcon = L.divIcon({
+            className: 'custom-marker',
+            html: '<div style="width:20px;height:20px;background:#ef4444;border-radius:50%;border:3px solid white;box-shadow:0 0 10px #ef4444;"></div>',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+
+        // Generate grid of nodes within current map bounds
+        function generateGraph() {
+            const bounds = map.getBounds();
+            const sw = bounds.getSouthWest();
+            const ne = bounds.getNorthEast();
+
+            nodes = [];
+            adj = [];
+
+            // Generate a grid of nodes
+            const gridSize = 25; // nodes per side
+            const latStep = (ne.lat - sw.lat) / gridSize;
+            const lngStep = (ne.lng - sw.lng) / gridSize;
+
+            for (let i = 0; i <= gridSize; i++) {
+                for (let j = 0; j <= gridSize; j++) {
+                    // Add some randomness
+                    const lat = sw.lat + i * latStep + (Math.random() - 0.5) * latStep * 0.5;
+                    const lng = sw.lng + j * lngStep + (Math.random() - 0.5) * lngStep * 0.5;
+                    nodes.push({ lat, lng, id: nodes.length });
+                    adj.push([]);
+                }
+            }
+
+            // Connect neighbors - use grid-based connection (connect to adjacent cells)
+            // Calculate expected distance between grid neighbors
+            const avgLatStep = haversine(sw.lat, sw.lng, sw.lat + latStep, sw.lng);
+            const avgLngStep = haversine(sw.lat, sw.lng, sw.lat, sw.lng + lngStep);
+            const maxConnectDist = Math.max(avgLatStep, avgLngStep) * 1.8; // Connect to nearby grid cells
+
+            for (let i = 0; i < nodes.length; i++) {
+                for (let j = i + 1; j < nodes.length; j++) {
+                    const d = haversine(nodes[i].lat, nodes[i].lng, nodes[j].lat, nodes[j].lng);
+                    if (d < maxConnectDist) {
+                        adj[i].push({ to: j, w: d });
+                        adj[j].push({ to: i, w: d });
+                    }
+                }
+            }
+
+            document.getElementById('node-count').textContent = nodes.length;
+            document.getElementById('edge-count').textContent = adj.reduce((a, e) => a + e.length, 0) / 2;
+        }
+
+        function haversine(lat1, lng1, lat2, lng2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        function findNearestNode(lat, lng) {
+            let minD = Infinity;
+            let nearest = 0;
+            for (let i = 0; i < nodes.length; i++) {
+                const d = haversine(lat, lng, nodes[i].lat, nodes[i].lng);
+                if (d < minD) {
+                    minD = d;
+                    nearest = i;
+                }
+            }
+            return nearest;
+        }
+
+        // Map click handler
+        map.on('click', function (e) {
+            if (!startLatLng) {
+                startLatLng = e.latlng;
+                if (startMarker) map.removeLayer(startMarker);
+                startMarker = L.marker(e.latlng, { icon: startIcon }).addTo(map);
+            } else if (!endLatLng) {
+                endLatLng = e.latlng;
+                if (endMarker) map.removeLayer(endMarker);
+                endMarker = L.marker(e.latlng, { icon: endIcon }).addTo(map);
+            } else {
+                // Reset
+                startLatLng = e.latlng;
+                endLatLng = null;
+                if (startMarker) map.removeLayer(startMarker);
+                if (endMarker) map.removeLayer(endMarker);
+                startMarker = L.marker(e.latlng, { icon: startIcon }).addTo(map);
+                endMarker = null;
+                clearPaths();
+            }
+        });
+
+        // Regenerate graph when map moves
+        map.on('moveend', generateGraph);
+
+        function clearPaths() {
+            if (dijkstraPath) { map.removeLayer(dijkstraPath); dijkstraPath = null; }
+            if (newPath) { map.removeLayer(newPath); newPath = null; }
+            document.getElementById('dijkstra-time').textContent = '—';
+            document.getElementById('new-time').textContent = '—';
+            document.getElementById('dijkstra-ops').textContent = '0';
+            document.getElementById('new-ops').textContent = '0';
+            document.getElementById('winner-banner').className = 'winner-banner';
+        }
+
+        function clearAll() {
+            if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
+            if (endMarker) { map.removeLayer(endMarker); endMarker = null; }
+            startLatLng = null;
+            endLatLng = null;
+            clearPaths();
+        }
+
+        function runRace() {
+            if (!startLatLng || !endLatLng) {
+                alert('Click two points on the map first!');
+                return;
+            }
+
+            clearPaths();
+            generateGraph();
+
+            const startNode = findNearestNode(startLatLng.lat, startLatLng.lng);
+            const endNode = findNearestNode(endLatLng.lat, endLatLng.lng);
+
+            dijkstraFinished = false;
+            newFinished = false;
+
+            // Run both algorithms
+            runDijkstra(startNode, endNode);
+            runNewAlgo(startNode, endNode);
+        }
+
+        function checkWinner() {
+            if (dijkstraFinished && newFinished) {
+                const banner = document.getElementById('winner-banner');
+                const text = document.getElementById('winner-text');
+
+                if (newTime < dijkstraTime) {
+                    banner.className = 'winner-banner show new';
+                    const pct = ((1 - newTime / dijkstraTime) * 100).toFixed(1);
+                    text.textContent = `Tsinghua SSSP wins! ${pct}% faster`;
+                } else {
+                    banner.className = 'winner-banner show dijkstra';
+                    text.textContent = 'Dijkstra wins!';
+                }
+                lucide.createIcons();
+            }
+        }
+
+        function runDijkstra(start, end) {
+            const dist = new Float32Array(nodes.length).fill(Infinity);
+            dist[start] = 0;
+            const prev = new Int32Array(nodes.length).fill(-1);
+            let open = [{ id: start, p: 0 }];
+            let visited = new Set();
+            let ops = 0;
+            const t0 = performance.now();
+
+            function step() {
+                for (let k = 0; k < 20; k++) {
+                    if (open.length === 0) {
+                        finish();
+                        return;
+                    }
+
+                    open.sort((a, b) => a.p - b.p);
+                    const cur = open.shift();
+                    const u = cur.id;
+
+                    if (u === end) {
+                        finish();
+                        return;
+                    }
+
+                    if (visited.has(u)) continue;
+                    visited.add(u);
+                    ops++;
+
+                    for (let e of adj[u]) {
+                        if (dist[u] + e.w < dist[e.to]) {
+                            dist[e.to] = dist[u] + e.w;
+                            prev[e.to] = u;
+                            open.push({ id: e.to, p: dist[e.to] });
+                        }
+                    }
+                }
+
+                document.getElementById('dijkstra-ops').textContent = ops;
+                requestAnimationFrame(step);
+            }
+
+            function finish() {
+                dijkstraTime = performance.now() - t0;
+                document.getElementById('dijkstra-time').textContent = dijkstraTime.toFixed(1) + ' ms';
+                document.getElementById('dijkstra-ops').textContent = ops + ' ✓';
+
+                // Draw path
+                const path = [];
+                let cur = end;
+                while (cur !== -1) {
+                    path.unshift([nodes[cur].lat, nodes[cur].lng]);
+                    cur = prev[cur];
+                }
+
+                if (path.length > 1) {
+                    dijkstraPath = L.polyline(path, {
+                        color: '#a78bfa',
+                        weight: 4,
+                        opacity: 0.9
+                    }).addTo(map);
+                }
+
+                dijkstraFinished = true;
+                checkWinner();
+            }
+
+            step();
+        }
+
+        function runNewAlgo(start, end) {
+            const dist = new Float32Array(nodes.length).fill(Infinity);
+            dist[start] = 0;
+            const prev = new Int32Array(nodes.length).fill(-1);
+            let frontier = [start];
+            let visited = new Set();
+            let ops = 0;
+            const clusterSize = Math.max(3, Math.ceil(Math.pow(nodes.length, 1 / 3)));
+            const t0 = performance.now();
+
+            function step() {
+                for (let k = 0; k < 20; k++) {
+                    if (frontier.length === 0) {
+                        finish();
+                        return;
+                    }
+
+                    // Cluster-based processing
+                    frontier.sort((a, b) => dist[a] - dist[b]);
+                    const batch = frontier.splice(0, clusterSize);
+                    ops++;
+
+                    for (let u of batch) {
+                        if (u === end) {
+                            finish();
+                            return;
+                        }
+
+                        if (visited.has(u)) continue;
+                        visited.add(u);
+
+                        for (let e of adj[u]) {
+                            if (dist[u] + e.w < dist[e.to]) {
+                                dist[e.to] = dist[u] + e.w;
+                                prev[e.to] = u;
+                                if (!visited.has(e.to) && !frontier.includes(e.to)) {
+                                    frontier.push(e.to);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                document.getElementById('new-ops').textContent = ops;
+                requestAnimationFrame(step);
+            }
+
+            function finish() {
+                newTime = performance.now() - t0;
+                document.getElementById('new-time').textContent = newTime.toFixed(1) + ' ms';
+                document.getElementById('new-ops').textContent = ops + ' ✓';
+
+                // Draw path (offset slightly so both are visible)
+                const path = [];
+                let cur = end;
+                while (cur !== -1) {
+                    path.unshift([nodes[cur].lat + 0.0005, nodes[cur].lng + 0.0005]);
+                    cur = prev[cur];
+                }
+
+                if (path.length > 1) {
+                    newPath = L.polyline(path, {
+                        color: '#4ade80',
+                        weight: 4,
+                        opacity: 0.9,
+                        dashArray: '8, 8'
+                    }).addTo(map);
+                }
+
+                newFinished = true;
+                checkWinner();
+            }
+
+            step();
+        }
+
+        // Initial graph generation
+        generateGraph();
+    </script>
+</body>
+
+</html>
