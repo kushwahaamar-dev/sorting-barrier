@@ -7,6 +7,7 @@ Interactive visualization comparing **Dijkstra's Algorithm (1956)** vs **Tsinghu
 ## Demo
 
 Click two points on the map → Hit **Race!** → Watch the algorithms compete.
+https://sorting-barrier.vercel.app/
 
 ## Paper
 
